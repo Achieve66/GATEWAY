@@ -119,7 +119,7 @@ function triggerFinalCrash() {
     document.body.innerHTML = `
         <div id="death-screen" style="background:black; color:red; width:100vw; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:9999999; cursor:none; overflow:hidden;">
             <h1 style="font-size:18vw; font-family:serif; text-shadow:0 0 40px red; margin:0;">HELP ME.</h1>
-            <p style="font-size:2vw; color:white; opacity:0.5;">RYUGYONG-26 ERROR</p>
+            <p style="font-size:2vw; color:white; opacity:0.5;"></p>
         </div>
     `;
 
