@@ -45,39 +45,67 @@ function startCreepyVoice() {
 }
 
 // 2. 生成駭客靈魂 (白色方塊)
+// 2. 自動獵殺：生成並衝向玩家 (Auto-Homing Soul)
 setTimeout(() => {
     if (systemCrashed) return;
     const glitchBlock = document.createElement('div');
     
-    // 生成在玩家當前視野附近
-    let spawnX = -posX + (window.innerWidth / 2) + 150;
-    let spawnY = -posY + (window.innerHeight / 2) + 150;
+    // 生成喺畫面隨機邊緣 (Spawn at screen edge)
+    const side = Math.floor(Math.random() * 4);
+    let startX, startY;
+    if (side === 0) { startX = -100; startY = Math.random() * window.innerHeight; } // 左
+    else if (side === 1) { startX = window.innerWidth + 100; startY = Math.random() * window.innerHeight; } // 右
+    else if (side === 2) { startX = Math.random() * window.innerWidth; startY = -100; } // 上
+    else { startX = Math.random() * window.innerWidth; startY = window.innerHeight + 100; } // 下
 
     glitchBlock.style.cssText = `
-        position: absolute; width: 40px; height: 40px;
-        background: white; z-index: 1001;
-        left: ${spawnX}px; top: ${spawnY}px;
-        box-shadow: 0 0 30px white;
+        position: fixed; width: 40px; height: 40px;
+        background: white; z-index: 10001;
+        left: ${startX}px; top: ${startY}px;
+        box-shadow: 0 0 40px 10px white;
+        transition: transform 0.05s linear;
+        pointer-events: none;
     `;
-    map.appendChild(glitchBlock);
+    document.body.appendChild(glitchBlock);
 
-    // 視覺閃爍
-    setInterval(() => {
-        glitchBlock.style.opacity = Math.random() > 0.3 ? '1' : '0.1';
-    }, 30);
+    let currentX = startX;
+    let currentY = startY;
+    const speed = 4; // 獵殺速度，數字越大越難逃
 
-    // 碰撞偵測 (移動端/PC 通用)
-    const checkArrival = setInterval(() => {
-        const rect = glitchBlock.getBoundingClientRect();
+    // 獵殺邏輯：每幀向中心點 (Center) 靠近
+    const hunterInterval = setInterval(() => {
+        if (systemCrashed) {
+            clearInterval(hunterInterval);
+            return;
+        }
+
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
-        if (Math.abs(rect.left + 20 - centerX) < 50 && Math.abs(rect.top + 20 - centerY) < 50) {
+        // 計算向量
+        const dx = centerX - (currentX + 20);
+        const dy = centerY - (currentY + 20);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 30) {
+            // 撞到中心點 -> 執行處決
             triggerFinalCrash();
-            clearInterval(checkArrival);
+            glitchBlock.remove();
+            clearInterval(hunterInterval);
+        } else {
+            // 移向中心
+            currentX += (dx / distance) * speed;
+            currentY += (dy / distance) * speed;
+            glitchBlock.style.left = `${currentX}px`;
+            glitchBlock.style.top = `${currentY}px`;
+            
+            // 越近中心，方塊變得越大越閃 (壓迫感)
+            const scale = 1 + (200 / distance); 
+            glitchBlock.style.transform = `scale(${scale})`;
+            glitchBlock.style.opacity = Math.random() > 0.2 ? '1' : '0.5';
         }
-    }, 50);
-}, 20000); // 20秒後出現，增加恐懼感
+    }, 16); // ~60fps
+}, 25000); // 25秒後開始獵殺
 
 // 3. 核心：跨平台終極封鎖 (The "I'm Cooked" Code)
 function triggerFinalCrash() {
