@@ -30,7 +30,7 @@ function spawnSecretDot() {
     // 點擊小點跳轉到另一個網站
     dot.onclick = (e) => {
         e.stopPropagation();
-        window.location.href = "your_other_website.html"; // 替換成你的網頁名稱
+        window.location.href = "https://achieve66.github.io/....../"; // 替換成你的網頁名稱
     };
 
     map.appendChild(dot);
